@@ -1,0 +1,68 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique
+  passwordHash String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  accounts   Account[]
+  positions  Position[]
+  snapshots  PortfolioSnapshot[]
+}
+
+model Account {
+  id                Int       @id @default(autoincrement())
+  userId            Int
+  name              String
+  broker            String    // e.g. "ETRADE"
+  externalAccountId String    // ID from E*TRADE API
+  type              String    // e.g. "TAXABLE", "ROTH_IRA"
+  currency          String    // e.g. "USD"
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id])
+  positions Position[]
+}
+
+model Position {
+  id            Int       @id @default(autoincrement())
+  userId        Int
+  accountId     Int
+  symbol        String
+  name          String
+  assetType     String    // "STOCK", "ETF", "CASH", ...
+  quantity      Float
+  averageCost   Float
+  marketPrice   Float
+  marketValue   Float
+  lastUpdatedAt DateTime  @default(now())
+
+  user    User    @relation(fields: [userId], references: [id])
+  account Account @relation(fields: [accountId], references: [id])
+}
+
+model PortfolioSnapshot {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  takenAt    DateTime @default(now())
+  totalValue Float
+
+  user User @relation(fields: [userId], references: [id])
+}
