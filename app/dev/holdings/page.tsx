@@ -37,7 +37,6 @@ export default function HoldingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Run once on mount to fetch holdings
   useEffect(() => {
     const fetchHoldings = async () => {
       try {
@@ -58,70 +57,230 @@ export default function HoldingsPage() {
     };
 
     fetchHoldings();
-  }, []); // empty deps array = run once when component mounts
+  }, []);
 
   if (loading) {
-    return <div className="p-6">Loading holdings...</div>;
+    return (
+      <main className="min-h-screen bg-slate-900 text-slate-100 p-6">
+        <div className="mx-auto max-w-5xl">Loading holdings...</div>
+      </main>
+    );
   }
 
   if (error) {
     return (
-      <div className="p-6 text-red-600">
-        Error loading holdings: {error}
-      </div>
+      <main className="min-h-screen bg-slate-900 text-slate-100 p-6">
+        <div className="mx-auto max-w-5xl text-red-400">
+          Error loading holdings: {error}
+        </div>
+      </main>
     );
   }
 
   if (!data || !data.ok) {
-    return <div className="p-6">No holdings data. Did you run the seed?</div>;
+    return (
+      <main className="min-h-screen bg-slate-900 text-slate-100 p-6">
+        <div className="mx-auto max-w-5xl">
+          No holdings data. Did you run the seed?
+        </div>
+      </main>
+    );
   }
 
-  return (
-    <main className="p-6 space-y-4">
-      <h1 className="text-2xl font-semibold">Demo Portfolio</h1>
-      <p className="text-sm text-gray-600">
-        User: <span className="font-mono">{data.user.email}</span>
-      </p>
-      <p className="text-lg font-medium">
-        Total value: ${data.totalValue.toFixed(2)}
-      </p>
+  // --- Derived metrics for UI ---
 
-      <table className="min-w-full border border-gray-200 text-sm">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="border-b px-3 py-2 text-left">Symbol</th>
-            <th className="border-b px-3 py-2 text-left">Name</th>
-            <th className="border-b px-3 py-2 text-left">Account</th>
-            <th className="border-b px-3 py-2 text-right">Qty</th>
-            <th className="border-b px-3 py-2 text-right">Avg Cost</th>
-            <th className="border-b px-3 py-2 text-right">Price</th>
-            <th className="border-b px-3 py-2 text-right">Market Value</th>
-          </tr>
-        </thead>
-        <tbody>
-          {data.positions.map((p) => (
-            <tr key={p.id} className="odd:bg-white even:bg-gray-50">
-              <td className="border-b px-3 py-2 font-mono">{p.symbol}</td>
-              <td className="border-b px-3 py-2">{p.name}</td>
-              <td className="border-b px-3 py-2">
-                {p.account.broker} · {p.account.name}
-              </td>
-              <td className="border-b px-3 py-2 text-right">
-                {p.quantity.toFixed(2)}
-              </td>
-              <td className="border-b px-3 py-2 text-right">
-                ${p.averageCost.toFixed(2)}
-              </td>
-              <td className="border-b px-3 py-2 text-right">
-                ${p.marketPrice.toFixed(2)}
-              </td>
-              <td className="border-b px-3 py-2 text-right">
-                ${p.marketValue.toFixed(2)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+  const totalValue = data.totalValue;
+
+  const enrichedPositions = data.positions.map((p) => {
+    const plDollar = (p.marketPrice - p.averageCost) * p.quantity;
+    const plPercent =
+      p.averageCost > 0
+        ? ((p.marketPrice - p.averageCost) / p.averageCost) * 100
+        : 0;
+    const allocationPercent =
+      totalValue > 0 ? (p.marketValue / totalValue) * 100 : 0;
+
+    return {
+      ...p,
+      plDollar,
+      plPercent,
+      allocationPercent,
+    };
+  });
+
+  const totalPositions = enrichedPositions.length;
+  const bestByPL =
+    enrichedPositions.length > 0
+      ? [...enrichedPositions].sort((a, b) => b.plDollar - a.plDollar)[0]
+      : null;
+
+  return (
+    <main className="min-h-screen bg-slate-950 text-slate-100 p-6">
+      <div className="mx-auto max-w-5xl space-y-6">
+        {/* Header */}
+        <header className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+          <div>
+            <h1 className="text-3xl font-semibold tracking-tight">
+              Demo Portfolio
+            </h1>
+            <p className="text-sm text-slate-300">
+              User: <span className="font-mono">{data.user.email}</span>
+            </p>
+          </div>
+        </header>
+
+        {/* Summary cards */}
+        <section className="grid gap-4 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Total Value
+            </p>
+            <p className="mt-2 text-3xl font-semibold">
+              ${totalValue.toFixed(2)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Positions
+            </p>
+            <p className="mt-2 text-3xl font-semibold">
+              {totalPositions}
+            </p>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg">
+            <p className="text-xs font-medium uppercase tracking-wide text-slate-400">
+              Top Position (by P/L)
+            </p>
+            {bestByPL ? (
+              <div className="mt-2">
+                <p className="text-sm font-medium text-slate-200">
+                  {bestByPL.symbol} · {bestByPL.name}
+                </p>
+                <p
+                  className={
+                    "text-lg font-semibold " +
+                    (bestByPL.plDollar >= 0
+                      ? "text-emerald-400"
+                      : "text-rose-400")
+                  }
+                >
+                  {bestByPL.plDollar >= 0 ? "+" : "-"}$
+                  {Math.abs(bestByPL.plDollar).toFixed(2)} (
+                  {bestByPL.plPercent >= 0 ? "+" : "-"}
+                  {Math.abs(bestByPL.plPercent).toFixed(2)}%)
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-sm text-slate-400">
+                No positions
+              </p>
+            )}
+          </div>
+        </section>
+
+        {/* Holdings table */}
+        <section className="rounded-2xl border border-slate-800 bg-slate-900/80 p-4 shadow-lg">
+          <h2 className="mb-3 text-base font-semibold text-slate-100">
+            Holdings
+          </h2>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full border-collapse text-sm">
+              <thead className="bg-slate-900">
+                <tr>
+                  <th className="border-b border-slate-800 px-3 py-2 text-left text-xs font-semibold text-slate-300">
+                    Symbol
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-left text-xs font-semibold text-slate-300">
+                    Name
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-left text-xs font-semibold text-slate-300">
+                    Account
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-right text-xs font-semibold text-slate-300">
+                    Qty
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-right text-xs font-semibold text-slate-300">
+                    Avg Cost
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-right text-xs font-semibold text-slate-300">
+                    Price
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-right text-xs font-semibold text-slate-300">
+                    Market Value
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-right text-xs font-semibold text-slate-300">
+                    P/L ($)
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-right text-xs font-semibold text-slate-300">
+                    P/L (%)
+                  </th>
+                  <th className="border-b border-slate-800 px-3 py-2 text-right text-xs font-semibold text-slate-300">
+                    Allocation
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {enrichedPositions.map((p) => (
+                  <tr
+                    key={p.id}
+                    className="odd:bg-slate-900/40 even:bg-slate-800/40"
+                  >
+                    <td className="border-b border-slate-800 px-3 py-2 font-mono text-slate-100">
+                      {p.symbol}
+                    </td>
+                    <td className="border-b border-slate-800 px-3 py-2 text-slate-100">
+                      {p.name}
+                    </td>
+                    <td className="border-b border-slate-800 px-3 py-2 text-slate-200">
+                      {p.account.broker} · {p.account.name}
+                    </td>
+                    <td className="border-b border-slate-800 px-3 py-2 text-right">
+                      {p.quantity.toFixed(2)}
+                    </td>
+                    <td className="border-b border-slate-800 px-3 py-2 text-right">
+                      ${p.averageCost.toFixed(2)}
+                    </td>
+                    <td className="border-b border-slate-800 px-3 py-2 text-right">
+                      ${p.marketPrice.toFixed(2)}
+                    </td>
+                    <td className="border-b border-slate-800 px-3 py-2 text-right">
+                      ${p.marketValue.toFixed(2)}
+                    </td>
+                    <td
+                      className={
+                        "border-b border-slate-800 px-3 py-2 text-right font-medium " +
+                        (p.plDollar >= 0
+                          ? "text-emerald-400"
+                          : "text-rose-400")
+                      }
+                    >
+                      {p.plDollar >= 0 ? "+" : "-"}$
+                      {Math.abs(p.plDollar).toFixed(2)}
+                    </td>
+                    <td
+                      className={
+                        "border-b border-slate-800 px-3 py-2 text-right font-medium " +
+                        (p.plPercent >= 0
+                          ? "text-emerald-400"
+                          : "text-rose-400")
+                      }
+                    >
+                      {p.plPercent >= 0 ? "+" : "-"}
+                      {Math.abs(p.plPercent).toFixed(2)}%
+                    </td>
+                    <td className="border-b border-slate-800 px-3 py-2 text-right text-slate-200">
+                      {p.allocationPercent.toFixed(2)}%
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </div>
     </main>
   );
 }
